@@ -147,7 +147,7 @@
   </header>
 
   <div class="actions no-print">
-    <button type="button" id="saveBtn">リンクを保存してコピー</button>
+    <button type="button" id="saveBtn">共有リンクをコピー</button>
     <button type="button" id="printBtn">印刷 / PDFで書き出し</button>
   </div>
 
@@ -326,7 +326,7 @@
   </div>
 
   <div class="memo">※ 目安を出すためのツールです。教育費は公立中心で幼児30・小35・中50・高60・大110万/年ほどを基準に進路と物価で自動調整。資産は項目ごとに利回り・種別・使いみちを設定できます。使いみち「教育費に充当」の資産は、毎年の教育費をまずそこから直接支払い（生涯上限まで）、足りない分だけ家計の支出になります。種別「ロック」は解禁年齢まで生活費に使えません。取り崩しは 預金→運用→解禁済みロック の順。悲観シナリオでは運用種別の利回りだけを下げます。配偶者の死亡後は生活費と年金を割合調整、75歳以降は医療・介護費を1人ずつ計上。税・社会保険の細部までは織り込んでいません。</div>
-  <div class="foot">入力は端末とURLに自動保存されます。<button type="button" id="exportBtn" class="linkbtn no-print">設定を書き出す</button>・<button type="button" id="importBtn" class="linkbtn no-print">読み込む</button>・<button type="button" id="resetBtn" class="linkbtn no-print">リセット</button></div>
+  <div class="foot"><span id="saveState">–</span>（この端末に自動保存）<br><button type="button" id="exportBtn" class="linkbtn no-print">設定を書き出す</button>・<button type="button" id="importBtn" class="linkbtn no-print">読み込む</button>・<button type="button" id="resetBtn" class="linkbtn no-print">リセット</button></div>
 </div>
 
 <script>
@@ -848,7 +848,7 @@ window.addEventListener('pointerup',function(){dragging=false;});
 
 /* 保存・復元（URL＋端末） */
 function getState(){
-  var st={f:{},c:[],e:[],a:[],i:[]};
+  var st={f:{},c:[],e:[],a:[],i:[],t:Date.now()};
   form.querySelectorAll('input[name],select[name]').forEach(function(el){st.f[el.name]=el.value;});
   document.querySelectorAll('.row.inc').forEach(function(r){st.i.push({w:r.querySelector('.in-who').value,a:r.querySelector('.in-age').value,m:r.querySelector('.in-amt').value,d:r.querySelector('.in-end').value});});
   document.querySelectorAll('.row.child').forEach(function(r){st.c.push({a:r.querySelector('.ch-age').value,p:r.querySelector('.ch-path').value});});
@@ -859,11 +859,19 @@ function getState(){
 function encode(st){return btoa(unescape(encodeURIComponent(JSON.stringify(st))));}
 function decode(str){try{return JSON.parse(decodeURIComponent(escape(atob(str))));}catch(e){return null;}}
 var hashTimer;
-function saveHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){try{history.replaceState(null,'','#s='+encode(getState()));}catch(e){}},400);}
-function saveLocal(){try{localStorage.setItem('lifeplan',JSON.stringify(getState()));}catch(e){}}
+function saveHash(){}
+function saveLocal(){
+  try{localStorage.setItem('lifeplan',JSON.stringify(getState()));showSaved(true);}
+  catch(e){showSaved(false);}
+}
+function showSaved(ok){
+  var el=document.getElementById('saveState'); if(!el)return;
+  if(ok){var d=new Date();el.textContent='保存済み '+d.getHours()+':'+('0'+d.getMinutes()).slice(-2);el.style.color='';}
+  else{el.textContent='⚠ この端末に保存できません（プライベートブラウズ？）';el.style.color='#B0432F';}
+}
 function loadLocal(){try{var s=localStorage.getItem('lifeplan');return s?JSON.parse(s):null;}catch(e){return null;}}
-function persist(){saveHash();saveLocal();}
-function flushSave(){try{clearTimeout(hashTimer);history.replaceState(null,'','#s='+encode(getState()));}catch(e){}saveLocal();}
+function persist(){saveLocal();}
+function flushSave(){saveLocal();}
 function applyState(st){
   if(!st)return false;
   if(st.f)Object.keys(st.f).forEach(function(k){if(form[k]!=null)form[k].value=st.f[k];});
@@ -907,9 +915,10 @@ document.getElementById('importBtn').onclick=function(){
   else{window.alert('コードを読み取れませんでした。');}
 };
 document.getElementById('saveBtn').onclick=function(){
-  try{history.replaceState(null,'','#s='+encode(getState()));}catch(e){}
-  var url=location.href,btn=this;
-  var ok=function(){btn.classList.add('done');btn.textContent='コピーしました ✓';setTimeout(function(){btn.classList.remove('done');btn.textContent='リンクを保存してコピー';},1600);};
+  saveLocal();
+  var url=location.origin+location.pathname+'#s='+encode(getState());
+  var btn=this;
+  var ok=function(){btn.classList.add('done');btn.textContent='コピーしました ✓';setTimeout(function(){btn.classList.remove('done');btn.textContent='共有リンクをコピー';},1600);};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(ok,function(){window.prompt('このURLをコピーしてください',url);});}
   else{window.prompt('このURLをコピーしてください',url);}
 };
@@ -927,14 +936,22 @@ document.getElementById('resetBtn').onclick=function(){
 /* 起動 */
 (function init(){
   var m=location.hash.match(/s=([^&]+)/);
-  var st=m?decode(m[1]):loadLocal();
+  var fromHash=m?decode(m[1]):null;
+  var fromLocal=loadLocal();
+  // 端末保存とURLの両方がある場合は「新しい方」を採用（古いブックマークによる巻き戻しを防ぐ）
+  var st=null;
+  if(fromHash&&fromLocal) st=((fromHash.t||0)>=(fromLocal.t||0))?fromHash:fromLocal;
+  else st=fromHash||fromLocal;
   if(!applyState(st)) seedDefaults();
+  // URLのハッシュは読み込んだら消す（ブックマークが古い状態を持ち続けないように）
+  if(m){try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}}
   form.addEventListener('input',function(){calc();persist();});
   form.addEventListener('change',flushSave);
   window.addEventListener('pagehide',flushSave);
   window.addEventListener('beforeunload',flushSave);
   document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flushSave();});
   calc();
+  saveLocal();
 })();
 </script>
 </body>
