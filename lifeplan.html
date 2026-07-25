@@ -463,7 +463,7 @@ function project(p){
   var assets=(p.assets||[]).map(function(a){return {name:a.name||'(無名)',amt:a.amt,yPct:a.yPct,cat:a.cat,unlock:a.unlock,purpose:a.purpose||'any',cap:a.cap||0,used:0};});
   var curCat={cash:0,invest:0,locked:0}; assets.forEach(function(a){curCat[a.cat]=(curCat[a.cat]||0)+a.amt;});
   var eduTotal=0,eduCovered=0;
-  var rows=[],minBal=1/0,minIdx=0,firstNeg=null,liqNeg=null,idx=0;
+  var rows=[],minBal=1/0,minIdx=0,firstNeg=null,liqNeg=null,idx=0,wasOwn=true,wasSp=true;
   for(var i=0;i<=span;i++){
     var oa=p.ownAge+i,sa=p.spAge+i,year=NOW+i;
     var ownAlive=oa<=p.ownDeath,spAlive=sa<=p.spDeath;
@@ -563,7 +563,8 @@ function project(p){
     var catNow={cash:0,invest:0,locked:0}; assets.forEach(function(a){catNow[a.cat]=(catNow[a.cat]||0)+a.amt;});
     var assetAmts=assets.map(function(a){return a.amt;});
     var kidAges=p.childAges.map(function(c){return c.age+i;});
-    rows.push({year:year,oa:oa,ownAlive:ownAlive,spAlive:spAlive,sa:spAlive?sa:'',kidsStr:kids.join(','),kidAges:kidAges,
+    var ownDied=wasOwn&&!ownAlive, spDied=wasSp&&!spAlive; wasOwn=ownAlive; wasSp=spAlive;
+    rows.push({year:year,oa:oa,ownAlive:ownAlive,spAlive:spAlive,ownDied:ownDied,spDied:spDied,sa:spAlive?sa:'',kidsStr:kids.join(','),kidAges:kidAges,
       income:income,expense:expense,net:net,bal:bal,evs:evs,edu:edu,eduEar:eduEar,cat:catNow,assetAmts:assetAmts,
       inOwn:inOwn,inSp:inSp,inRe:inRe,inPen:inPen,inSev:inSev,inEvent:inEvent,
       exLiving:exLiving,exHousing:exHousing,exIns:exIns,exEdu:exEdu,exMed:exMed,exEvent:exEvent,eduEach:eduEach});
@@ -612,6 +613,7 @@ function render(b,pr){
   drawChart(b.rows,b.minIdx,b.marks,pr.rows);
   drawFlowChart(b.rows,b.marks);
   drawAssetTable(b);
+  AEP={ownRetire:num('ownRetire'),spRetire:num('spRetire'),pensionStart:num('pensionStart'),leaveAge:num('leaveAge')};
   drawTable(b.rows,b.minIdx,b.assetMeta);
 }
 function drawAssetTable(b){
@@ -671,8 +673,27 @@ function drawChart(rows,minIdx,marks,pess){
 }
 
 var LASTROWS=null;
+function autoEvents(r,p){
+  var out=[];
+  var oa=r.oa,sa=r.sa;
+  if(r.ownAlive&&oa===p.ownRetire) out.push('本人 退職');
+  if(r.spAlive&&sa!==''&&sa===p.spRetire) out.push('配偶者 退職');
+  if(oa===p.pensionStart) out.push('年金開始');
+  (r.kidAges||[]).forEach(function(a,ci){
+    var nm='子'+(ci+1);
+    if(a===6) out.push(nm+' 小学校');
+    else if(a===12) out.push(nm+' 中学校');
+    else if(a===15) out.push(nm+' 高校');
+    else if(a===18) out.push(nm+' 大学/専門');
+    else if(a===p.leaveAge) out.push(nm+' 独立');
+  });
+  if(r.ownDied) out.push('本人 死亡（想定）');
+  if(r.spDied) out.push('配偶者 死亡（想定）');
+  return out;
+}
+var AEP={};
 function evText(r){
-  var parts=[];
+  var parts=autoEvents(r,AEP).slice();
   if(r.evs&&r.evs.length)r.evs.forEach(function(e){parts.push((e.n||'イベント')+(e.income?' +':' -')+Math.round(e.amt)+'万');});
   return parts.length?esc(parts.join('、')):'–';
 }
@@ -751,7 +772,9 @@ function buildCashflow(rows){
   line('資産合計',function(r){return r.bal;},'cf-bal');
   sec('ライフイベント');
   body+='<tr class="cf-ev"><td class="cf-h">イベント</td>'+rows.map(function(r){
-    var t=(r.evs&&r.evs.length)?r.evs.map(function(e){return esc(e.n||'');}).filter(Boolean).join('<br>'):'';
+    var list=autoEvents(r,AEP).slice();
+    if(r.evs&&r.evs.length)r.evs.forEach(function(e){if(e.n)list.push(e.n);});
+    var t=list.length?list.map(function(x){return esc(x);}).join('<br>'):'';
     return '<td>'+t+'</td>';}).join('')+'</tr>';
   return {head:head,body:body};
 }
