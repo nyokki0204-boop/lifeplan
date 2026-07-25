@@ -534,6 +534,8 @@ function project(p){
   var inflation=p.inflation/100;
   var span=Math.max(p.ownDeath-p.ownAge,p.spDeath-p.spAge);
   var assets=(p.assets||[]).map(function(a){return {name:a.name||'(無名)',amt:a.amt,yPct:a.yPct,cat:a.cat,unlock:a.unlock,purpose:a.purpose||'any',cap:a.cap||0,used:0};});
+  // 資産が1件も登録されていない場合、収支の受け皿として預金を1件用意する（黒字が消えるのを防ぐ）
+  if(!assets.length) assets.push({name:'預金',amt:0,yPct:0,cat:'cash',unlock:0,purpose:'any',cap:0,used:0});
   var curCat={cash:0,invest:0,locked:0}; assets.forEach(function(a){curCat[a.cat]=(curCat[a.cat]||0)+a.amt;});
   var eduTotal=0,eduCovered=0;
   var rows=[],minBal=1/0,minIdx=0,firstNeg=null,liqNeg=null,idx=0,wasOwn=true,wasSp=true;
