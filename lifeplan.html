@@ -407,6 +407,10 @@ var NOW=new Date().getFullYear();
 var LAST=null;
 
 /* 子ども行 */
+/* 要素が無い場合でも安全に値を読む（旧データ・旧DOMとの互換用） */
+function qv(row,sel,def){var el=row.querySelector(sel);return el?el.value:def;}
+function qn(row,sel,def){var el=row.querySelector(sel);var v=el?parseFloat(el.value):NaN;return isNaN(v)?(def||0):v;}
+
 var childrenBox=document.getElementById('children');
 function addChildRow(age,path){
   var d=document.createElement('div'); d.className='row child';
@@ -512,7 +516,8 @@ function addIdecoRow(age,amt){makeStepRow(idecoBox,age,amt);}
 document.getElementById('addNisa').onclick=function(){addNisaRow(40,120);calc();persist();};
 document.getElementById('addIdeco').onclick=function(){addIdecoRow(40,24);calc();persist();};
 function readSteps(box){
-  return [].map.call(box.querySelectorAll('.row.step'),function(r){return {age:parseFloat(r.querySelector('.st-age').value)||0,amt:parseFloat(r.querySelector('.st-amt').value)||0};})
+  if(!box)return [];
+  return [].map.call(box.querySelectorAll('.row.step'),function(r){return {age:qn(r,'.st-age',0),amt:qn(r,'.st-amt',0)};})
     .sort(function(a,b){return a.age-b.age;});
 }
 function stepAmount(steps,curAge){
@@ -549,9 +554,9 @@ function readInputs(){
   ['ownAge','spAge','ownDeath','spDeath','ownRetire','spRetire','pensionStart','ownInc','spInc','raise','pension','pensionSlide','reEmploy','ownSev','spSev','living','senior1Age','senior1Ratio','senior2Ratio','leaveAge','leaveCut','housing','housingEnd','insurance','inflation','medical','survLiving','survPension'].forEach(function(k){p[k]=num(k);});
   p.nisaSteps=readSteps(nisaBox);
   p.idecoSteps=readSteps(idecoBox);
-  p.childAges=[].map.call(document.querySelectorAll('.row.child'),function(r){return {age:parseFloat(r.querySelector('.ch-age').value)||0,priv:r.querySelector('.ch-path').value==='private'?1.7:1.0};});
-  p.events=[].map.call(document.querySelectorAll('.row.event'),function(r){return {name:r.querySelector('.ev-name').value,age:parseFloat(r.querySelector('.ev-age').value)||0,amt:parseFloat(r.querySelector('.ev-amt').value)||0,every:parseFloat(r.querySelector('.ev-every').value)||0,until:parseFloat(r.querySelector('.ev-until').value)||0,income:r.querySelector('.ev-type').value==='income'};});
-  p.assets=[].map.call(document.querySelectorAll('.row.asset'),function(r){return {name:r.querySelector('.as-name').value,amt:parseFloat(r.querySelector('.as-amt').value)||0,yPct:parseFloat(r.querySelector('.as-yield').value)||0,cat:r.querySelector('.as-cat').value,unlock:parseFloat(r.querySelector('.as-unlock').value)||0,purpose:r.querySelector('.as-purpose').value,cap:parseFloat(r.querySelector('.as-cap').value)||0,grp:r.querySelector('.as-grp').value};});
+  p.childAges=[].map.call(document.querySelectorAll('.row.child'),function(r){return {age:qn(r,'.ch-age',0),priv:qv(r,'.ch-path','public')==='private'?1.7:1.0};});
+  p.events=[].map.call(document.querySelectorAll('.row.event'),function(r){return {name:qv(r,'.ev-name',''),age:qn(r,'.ev-age',0),amt:qn(r,'.ev-amt',0),every:qn(r,'.ev-every',0),until:qn(r,'.ev-until',0),income:qv(r,'.ev-type','expense')==='income'};});
+  p.assets=[].map.call(document.querySelectorAll('.row.asset'),function(r){return {name:qv(r,'.as-name',''),amt:qn(r,'.as-amt',0),yPct:qn(r,'.as-yield',0),cat:qv(r,'.as-cat','cash'),unlock:qn(r,'.as-unlock',0),purpose:qv(r,'.as-purpose','any'),cap:qn(r,'.as-cap',0),grp:qv(r,'.as-grp','auto')};});
   p.incChanges=[].map.call(document.querySelectorAll('.row.inc'),function(r){return {who:r.querySelector('.in-who').value,age:parseFloat(r.querySelector('.in-age').value)||0,amt:parseFloat(r.querySelector('.in-amt').value)||0,end:parseFloat(r.querySelector('.in-end').value)||120};});
   p.mkt=null;
   return p;
@@ -1115,12 +1120,12 @@ window.addEventListener('pointerup',function(){dragging=false;});
 function getState(){
   var st={f:{},c:[],e:[],a:[],i:[],ns:[],id:[],t:Date.now()};
   form.querySelectorAll('input[name],select[name]').forEach(function(el){st.f[el.name]=el.value;});
-  document.querySelectorAll('#nisaSteps .row.step').forEach(function(r){st.ns.push({a:r.querySelector('.st-age').value,m:r.querySelector('.st-amt').value});});
-  document.querySelectorAll('#idecoSteps .row.step').forEach(function(r){st.id.push({a:r.querySelector('.st-age').value,m:r.querySelector('.st-amt').value});});
-  document.querySelectorAll('.row.inc').forEach(function(r){st.i.push({w:r.querySelector('.in-who').value,a:r.querySelector('.in-age').value,m:r.querySelector('.in-amt').value,d:r.querySelector('.in-end').value});});
-  document.querySelectorAll('.row.child').forEach(function(r){st.c.push({a:r.querySelector('.ch-age').value,p:r.querySelector('.ch-path').value});});
-  document.querySelectorAll('.row.event').forEach(function(r){st.e.push({n:r.querySelector('.ev-name').value,a:r.querySelector('.ev-age').value,m:r.querySelector('.ev-amt').value,v:r.querySelector('.ev-every').value,u:r.querySelector('.ev-until').value,t:r.querySelector('.ev-type').value});});
-  document.querySelectorAll('.row.asset').forEach(function(r){st.a.push({n:r.querySelector('.as-name').value,m:r.querySelector('.as-amt').value,y:r.querySelector('.as-yield').value,c:r.querySelector('.as-cat').value,u:r.querySelector('.as-unlock').value,p:r.querySelector('.as-purpose').value,x:r.querySelector('.as-cap').value,g:r.querySelector('.as-grp').value});});
+  document.querySelectorAll('#nisaSteps .row.step').forEach(function(r){st.ns.push({a:qv(r,'.st-age','0'),m:qv(r,'.st-amt','0')});});
+  document.querySelectorAll('#idecoSteps .row.step').forEach(function(r){st.id.push({a:qv(r,'.st-age','0'),m:qv(r,'.st-amt','0')});});
+  document.querySelectorAll('.row.inc').forEach(function(r){st.i.push({w:qv(r,'.in-who','own'),a:qv(r,'.in-age','0'),m:qv(r,'.in-amt','0'),d:qv(r,'.in-end','120')});});
+  document.querySelectorAll('.row.child').forEach(function(r){st.c.push({a:qv(r,'.ch-age','0'),p:qv(r,'.ch-path','public')});});
+  document.querySelectorAll('.row.event').forEach(function(r){st.e.push({n:qv(r,'.ev-name',''),a:qv(r,'.ev-age','0'),m:qv(r,'.ev-amt','0'),v:qv(r,'.ev-every','0'),u:qv(r,'.ev-until','0'),t:qv(r,'.ev-type','expense')});});
+  document.querySelectorAll('.row.asset').forEach(function(r){st.a.push({n:qv(r,'.as-name',''),m:qv(r,'.as-amt','0'),y:qv(r,'.as-yield','0'),c:qv(r,'.as-cat','cash'),u:qv(r,'.as-unlock','0'),p:qv(r,'.as-purpose','any'),x:qv(r,'.as-cap','0'),g:qv(r,'.as-grp','auto')});});
   return st;
 }
 function encode(st){return btoa(unescape(encodeURIComponent(JSON.stringify(st))));}
@@ -1182,9 +1187,15 @@ document.getElementById('exportBtn').onclick=function(){
 };
 document.getElementById('importBtn').onclick=function(){
   var code=window.prompt('設定コードを貼り付けてください');
-  if(!code)return; var st=decode(code.trim());
-  if(st&&applyState(st)){calc();persist();window.alert('設定を読み込みました。');}
-  else{window.alert('コードを読み取れませんでした。');}
+  if(!code)return;
+  var st=decode(code.trim().replace(/\s+/g,''));
+  if(!st){window.alert('コードを読み取れませんでした。コード全体がコピーされているか確認してください。');return;}
+  try{
+    applyState(st); calc(); persist();
+    window.alert('設定を読み込みました。');
+  }catch(err){
+    window.alert('読み込み中にエラーが発生しました：'+err.message);
+  }
 };
 document.getElementById('saveBtn').onclick=function(){
   saveLocal();
