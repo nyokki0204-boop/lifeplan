@@ -38,6 +38,18 @@
   .scenario.warn{border-left-color:var(--brick);color:var(--brick)}
   .chart-box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 12px 8px;margin:12px 0}
   .chart-title{font-family:var(--serif);font-size:14px;color:var(--ink);padding:0 4px 8px}
+  .pie-wrap{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:4px 4px 0}
+  .pie-wrap svg{width:190px;height:190px;flex:0 0 auto}
+  @media(max-width:420px){.pie-wrap{justify-content:center}.pie-wrap svg{width:170px;height:170px}}
+  .pie-legend{flex:1;min-width:170px;font-size:12.5px}
+  .pie-legend .grp{margin-bottom:9px}
+  .pie-legend .g-head{display:flex;justify-content:space-between;font-weight:800;font-variant-numeric:tabular-nums;padding-bottom:2px;border-bottom:1px solid var(--line-soft)}
+  .pie-legend .g-head i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .pie-legend .it{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;padding:1px 0 1px 17px}
+  .pie-ctrl{display:flex;align-items:center;gap:12px;padding:10px 4px 0}
+  .pie-ctrl input[type=range]{flex:1;accent-color:var(--pine)}
+  .pie-year{font-family:var(--serif);font-size:15px;min-width:112px;text-align:right}
+  .pie-year small{display:block;font-family:var(--sans);font-size:11px;color:var(--muted)}
   svg{display:block;width:100%;height:auto;touch-action:none}
   .legend{display:flex;gap:15px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding:8px 4px 2px}
   .legend i{display:inline-block;width:13px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
@@ -52,7 +64,8 @@
   .asset-top .as-name{flex:1}
   .asset-top .as-cat{width:96px;flex:0 0 auto}
   .asset-bot{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
-  .asset-bot2{display:grid;grid-template-columns:1.3fr 1fr;gap:8px;margin-top:8px}
+  .asset-bot2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+  @media(max-width:520px){.asset-bot2{grid-template-columns:1fr 1fr}}
   .body{padding:6px 16px 18px;border-top:1px solid var(--line-soft)}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:440px){.grid{grid-template-columns:1fr}}
@@ -200,6 +213,19 @@
   </div>
   <div class="scenario" id="scen"></div>
   <div class="scenario" id="eduInfo" style="border-left-color:#976A26"></div>
+
+  <div class="chart-box">
+    <div class="chart-title">資産構成（円グラフ）</div>
+    <div class="pie-wrap">
+      <svg id="pie" viewBox="0 0 200 200" role="img" aria-label="資産構成の円グラフ"></svg>
+      <div id="pieLegend" class="pie-legend"></div>
+    </div>
+    <div class="pie-ctrl">
+      <input type="range" id="pieYear" min="0" max="0" value="0">
+      <div class="pie-year" id="pieYearLabel">–</div>
+    </div>
+    <div class="hint" style="padding:4px 4px 0">スライダーで年を動かすと、その年の構成に変わります。内側の輪＝3分類、外側の輪＝個別の資産。</div>
+  </div>
 
   <div class="chart-box">
     <div class="chart-title">資産の種類別・内訳</div>
@@ -443,7 +469,7 @@ PRESETS.forEach(function(ps){
 
 /* 資産行（名前・金額・利回り・種別・解禁年齢） */
 var assetsBox=document.getElementById('assets');
-function addAssetRow(name,amt,yld,cat,unlock,purpose,cap){
+function addAssetRow(name,amt,yld,cat,unlock,purpose,cap,grp){
   var d=document.createElement('div'); d.className='row asset';
   d.innerHTML='<div class="asset-top">'+
       '<input type="text" class="as-name" placeholder="資産名" value="'+(name||'')+'">'+
@@ -457,14 +483,16 @@ function addAssetRow(name,amt,yld,cat,unlock,purpose,cap){
     '<div class="asset-bot2">'+
       '<div class="field"><label>使いみち</label><select class="as-purpose"><option value="any">指定なし（生活費全般）</option><option value="edu">教育費に充当</option></select></div>'+
       '<div class="field"><label>充当の上限（生涯）</label><div class="with-unit"><input type="number" class="as-cap" value="'+(cap==null?0:cap)+'" min="0"><span class="u">万</span></div><span class="hint">0＝全額使ってよい</span></div>'+
+      '<div class="field"><label>グラフ分類</label><select class="as-grp"><option value="auto">種別に合わせる</option><option value="cash">現金系</option><option value="invest">投資系</option><option value="pension">年金系</option></select></div>'+
     '</div>';
   if(cat) d.querySelector('.as-cat').value=cat;
   if(purpose==='edu') d.querySelector('.as-purpose').value='edu';
+  if(grp) d.querySelector('.as-grp').value=grp;
   d.querySelector('.del').onclick=function(){d.remove();calc();persist();};
   d.querySelectorAll('input,select').forEach(function(i){i.addEventListener('input',function(){calc();persist();});});
   assetsBox.appendChild(d);
 }
-document.getElementById('addAsset').onclick=function(){addAssetRow('',100,1,'cash',65,'any',0);calc();persist();};
+document.getElementById('addAsset').onclick=function(){addAssetRow('',100,1,'cash',65,'any',0,'auto');calc();persist();};
 
 /* 積立の段階（◯歳から◯万/年） */
 function makeStepRow(box,age,amt){
@@ -523,7 +551,7 @@ function readInputs(){
   p.idecoSteps=readSteps(idecoBox);
   p.childAges=[].map.call(document.querySelectorAll('.row.child'),function(r){return {age:parseFloat(r.querySelector('.ch-age').value)||0,priv:r.querySelector('.ch-path').value==='private'?1.7:1.0};});
   p.events=[].map.call(document.querySelectorAll('.row.event'),function(r){return {name:r.querySelector('.ev-name').value,age:parseFloat(r.querySelector('.ev-age').value)||0,amt:parseFloat(r.querySelector('.ev-amt').value)||0,every:parseFloat(r.querySelector('.ev-every').value)||0,until:parseFloat(r.querySelector('.ev-until').value)||0,income:r.querySelector('.ev-type').value==='income'};});
-  p.assets=[].map.call(document.querySelectorAll('.row.asset'),function(r){return {name:r.querySelector('.as-name').value,amt:parseFloat(r.querySelector('.as-amt').value)||0,yPct:parseFloat(r.querySelector('.as-yield').value)||0,cat:r.querySelector('.as-cat').value,unlock:parseFloat(r.querySelector('.as-unlock').value)||0,purpose:r.querySelector('.as-purpose').value,cap:parseFloat(r.querySelector('.as-cap').value)||0};});
+  p.assets=[].map.call(document.querySelectorAll('.row.asset'),function(r){return {name:r.querySelector('.as-name').value,amt:parseFloat(r.querySelector('.as-amt').value)||0,yPct:parseFloat(r.querySelector('.as-yield').value)||0,cat:r.querySelector('.as-cat').value,unlock:parseFloat(r.querySelector('.as-unlock').value)||0,purpose:r.querySelector('.as-purpose').value,cap:parseFloat(r.querySelector('.as-cap').value)||0,grp:r.querySelector('.as-grp').value};});
   p.incChanges=[].map.call(document.querySelectorAll('.row.inc'),function(r){return {who:r.querySelector('.in-who').value,age:parseFloat(r.querySelector('.in-age').value)||0,amt:parseFloat(r.querySelector('.in-amt').value)||0,end:parseFloat(r.querySelector('.in-end').value)||120};});
   p.mkt=null;
   return p;
@@ -533,7 +561,7 @@ function project(p){
   var raise=p.raise/100,slide=p.pensionSlide/100,s1=p.senior1Ratio/100,s2=p.senior2Ratio/100,svLiv=p.survLiving/100,svPen=p.survPension/100;
   var inflation=p.inflation/100;
   var span=Math.max(p.ownDeath-p.ownAge,p.spDeath-p.spAge);
-  var assets=(p.assets||[]).map(function(a){return {name:a.name||'(無名)',amt:a.amt,yPct:a.yPct,cat:a.cat,unlock:a.unlock,purpose:a.purpose||'any',cap:a.cap||0,used:0};});
+  var assets=(p.assets||[]).map(function(a){return {name:a.name||'(無名)',amt:a.amt,yPct:a.yPct,cat:a.cat,unlock:a.unlock,purpose:a.purpose||'any',cap:a.cap||0,grp:a.grp||'auto',used:0};});
   // 資産が1件も登録されていない場合、収支の受け皿として預金を1件用意する（黒字が消えるのを防ぐ）
   if(!assets.length) assets.push({name:'預金',amt:0,yPct:0,cat:'cash',unlock:0,purpose:'any',cap:0,used:0});
   var curCat={cash:0,invest:0,locked:0}; assets.forEach(function(a){curCat[a.cat]=(curCat[a.cat]||0)+a.amt;});
@@ -650,7 +678,10 @@ function project(p){
   if(p.ownRetire-p.ownAge>=0&&p.ownRetire-p.ownAge<rows.length)marks.push({i:p.ownRetire-p.ownAge,label:'退職'});
   if(p.pensionStart-p.ownAge>=0&&p.pensionStart-p.ownAge<rows.length&&p.pensionStart!==p.ownRetire)marks.push({i:p.pensionStart-p.ownAge,label:'年金'});
   if(yng!==null){var ei=22-yng;if(ei>0&&ei<rows.length)marks.push({i:ei,label:'教育おわり'});}
-  var assetMeta=assets.map(function(a){return {name:a.name,cat:a.cat,unlock:a.unlock,purpose:a.purpose};});
+  var assetMeta=assets.map(function(a){
+    var g=a.grp&&a.grp!=='auto' ? a.grp : (a.cat==='cash'?'cash':a.cat==='invest'?'invest':'pension');
+    return {name:a.name,cat:a.cat,unlock:a.unlock,purpose:a.purpose,grp:g};
+  });
   return {rows:rows,minIdx:minIdx,minBal:minBal,firstNeg:firstNeg,liqNeg:liqNeg,marks:marks,eduTotal:eduTotal,eduCovered:eduCovered,curCat:curCat,assetMeta:assetMeta};
 }
 
@@ -689,6 +720,13 @@ function render(b,pr){
   drawFlowChart(b.rows,b.marks);
   drawAssetTable(b);
   AEP={ownRetire:num('ownRetire'),spRetire:num('spRetire'),pensionStart:num('pensionStart'),leaveAge:num('leaveAge')};
+  PIEDATA={rows:b.rows,meta:b.assetMeta};
+  var sl=document.getElementById('pieYear');
+  var keep=parseInt(sl.value,10)||0;
+  sl.max=b.rows.length-1;
+  if(keep>b.rows.length-1)keep=0;
+  sl.value=keep;
+  drawPie(keep);
   drawTable(b.rows,b.minIdx,b.assetMeta);
 }
 function drawAssetTable(b){
@@ -785,6 +823,91 @@ function rowsHTML(rows,minIdx){
       '<td style="text-align:left">'+evText(r)+'</td></tr>';
   }).join('');
 }
+/* 資産構成の円グラフ（内側＝3分類、外側＝個別資産） */
+var PIEDATA=null;
+var CATDEF=[{k:'cash',lbl:'現金系',c:'#5B6E64'},{k:'invest',lbl:'投資系',c:'#1B463C'},{k:'pension',lbl:'年金系',c:'#976A26'}];
+function grpTotals(r,meta){
+  var t={cash:0,invest:0,pension:0};
+  meta.forEach(function(m,mi){t[m.grp]=(t[m.grp]||0)+(r.assetAmts[mi]||0);});
+  return t;
+}
+function shade(hex,pct){
+  var n=parseInt(hex.slice(1),16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=Math.round(r+(255-r)*pct);g=Math.round(g+(255-g)*pct);b=Math.round(b+(255-b)*pct);
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function arcPath(cx,cy,rOut,rIn,a0,a1){
+  var large=(a1-a0)>Math.PI?1:0;
+  var x0=cx+rOut*Math.cos(a0),y0=cy+rOut*Math.sin(a0);
+  var x1=cx+rOut*Math.cos(a1),y1=cy+rOut*Math.sin(a1);
+  var x2=cx+rIn*Math.cos(a1),y2=cy+rIn*Math.sin(a1);
+  var x3=cx+rIn*Math.cos(a0),y3=cy+rIn*Math.sin(a0);
+  return 'M'+x0.toFixed(2)+' '+y0.toFixed(2)+
+    ' A'+rOut+' '+rOut+' 0 '+large+' 1 '+x1.toFixed(2)+' '+y1.toFixed(2)+
+    ' L'+x2.toFixed(2)+' '+y2.toFixed(2)+
+    ' A'+rIn+' '+rIn+' 0 '+large+' 0 '+x3.toFixed(2)+' '+y3.toFixed(2)+' Z';
+}
+function drawPie(idx){
+  if(!PIEDATA)return;
+  var rows=PIEDATA.rows, meta=PIEDATA.meta;
+  if(idx<0)idx=0; if(idx>rows.length-1)idx=rows.length-1;
+  var r=rows[idx];
+  var total=r.bal;
+  var gt=grpTotals(r,meta);
+  var cx=100,cy=100;
+  var s='';
+  if(!(total>0)){
+    s='<circle cx="100" cy="100" r="76" fill="none" stroke="#D2DBD1" stroke-width="26"/>'+
+      '<text x="100" y="104" font-size="13" fill="#63736A" text-anchor="middle">資産なし</text>';
+    document.getElementById('pie').innerHTML=s;
+    document.getElementById('pieLegend').innerHTML='<div class="hint">この年の資産はありません。</div>';
+    return;
+  }
+  // 内側リング（3分類）
+  var a=-Math.PI/2;
+  CATDEF.forEach(function(cd){
+    var v=gt[cd.k]||0; if(v<=0)return;
+    var a2=a+(v/total)*Math.PI*2;
+    s+='<path d="'+arcPath(cx,cy,64,40,a,a2)+'" fill="'+cd.c+'"/>';
+    a=a2;
+  });
+  // 外側リング（個別資産、分類ごとに濃淡）
+  a=-Math.PI/2;
+  CATDEF.forEach(function(cd){
+    var idxs=[]; meta.forEach(function(m,mi){if(m.grp===cd.k&&(r.assetAmts[mi]||0)>0)idxs.push(mi);});
+    idxs.forEach(function(mi,k){
+      var v=r.assetAmts[mi];
+      var a2=a+(v/total)*Math.PI*2;
+      var col=shade(cd.c,0.12+ (idxs.length>1? k/(idxs.length)*0.5 :0));
+      s+='<path d="'+arcPath(cx,cy,88,67,a,a2)+'" fill="'+col+'" stroke="#F6F8F2" stroke-width="0.8"/>';
+      a=a2;
+    });
+  });
+  // 中央の合計
+  var t=Math.round(total);
+  var disp=Math.abs(t)>=10000?(t/10000).toFixed(2).replace(/\.?0+$/,'')+'億':t.toLocaleString();
+  s+='<text x="100" y="97" font-size="19" font-weight="700" fill="#16231E" text-anchor="middle">'+disp+'</text>';
+  s+='<text x="100" y="112" font-size="10" fill="#63736A" text-anchor="middle">万円</text>';
+  document.getElementById('pie').innerHTML=s;
+  // 凡例
+  var lg='';
+  CATDEF.forEach(function(cd){
+    var v=gt[cd.k]||0;
+    var pct=Math.round(v/total*100);
+    lg+='<div class="grp"><div class="g-head"><span><i style="background:'+cd.c+'"></i>'+cd.lbl+'</span><span>'+Math.round(v).toLocaleString()+'万・'+pct+'%</span></div>';
+    meta.forEach(function(m,mi){
+      var av=r.assetAmts[mi]||0;
+      if(m.grp!==cd.k||av<=0)return;
+      lg+='<div class="it"><span>'+esc(m.name)+'</span><span>'+Math.round(av).toLocaleString()+'</span></div>';
+    });
+    lg+='</div>';
+  });
+  document.getElementById('pieLegend').innerHTML=lg;
+  var lab=document.getElementById('pieYearLabel');
+  lab.innerHTML=r.year+'年<small>本人'+(r.ownAlive?r.oa+'歳':'–')+'</small>';
+}
+document.getElementById('pieYear').addEventListener('input',function(){drawPie(parseInt(this.value,10)||0);});
+
 function drawTable(rows,minIdx,meta){
   LASTROWS={rows:rows,minIdx:minIdx,meta:meta||[]};
   document.querySelector('#table tbody').innerHTML=rowsHTML(rows,minIdx);
@@ -997,7 +1120,7 @@ function getState(){
   document.querySelectorAll('.row.inc').forEach(function(r){st.i.push({w:r.querySelector('.in-who').value,a:r.querySelector('.in-age').value,m:r.querySelector('.in-amt').value,d:r.querySelector('.in-end').value});});
   document.querySelectorAll('.row.child').forEach(function(r){st.c.push({a:r.querySelector('.ch-age').value,p:r.querySelector('.ch-path').value});});
   document.querySelectorAll('.row.event').forEach(function(r){st.e.push({n:r.querySelector('.ev-name').value,a:r.querySelector('.ev-age').value,m:r.querySelector('.ev-amt').value,v:r.querySelector('.ev-every').value,u:r.querySelector('.ev-until').value,t:r.querySelector('.ev-type').value});});
-  document.querySelectorAll('.row.asset').forEach(function(r){st.a.push({n:r.querySelector('.as-name').value,m:r.querySelector('.as-amt').value,y:r.querySelector('.as-yield').value,c:r.querySelector('.as-cat').value,u:r.querySelector('.as-unlock').value,p:r.querySelector('.as-purpose').value,x:r.querySelector('.as-cap').value});});
+  document.querySelectorAll('.row.asset').forEach(function(r){st.a.push({n:r.querySelector('.as-name').value,m:r.querySelector('.as-amt').value,y:r.querySelector('.as-yield').value,c:r.querySelector('.as-cat').value,u:r.querySelector('.as-unlock').value,p:r.querySelector('.as-purpose').value,x:r.querySelector('.as-cap').value,g:r.querySelector('.as-grp').value});});
   return st;
 }
 function encode(st){return btoa(unescape(encodeURIComponent(JSON.stringify(st))));}
@@ -1024,22 +1147,22 @@ function applyState(st){
   incBox.innerHTML='';(st.i||[]).forEach(function(x){addIncRow(x.w,x.a,x.m,x.d);});
   nisaBox.innerHTML='';(st.ns||[]).forEach(function(x){addNisaRow(x.a,x.m);}); if(!(st.ns&&st.ns.length))seedNisa();
   idecoBox.innerHTML='';(st.id||[]).forEach(function(x){addIdecoRow(x.a,x.m);}); if(!(st.id&&st.id.length))seedIdeco();
-  if(st.a&&st.a.length){assetsBox.innerHTML='';st.a.forEach(function(a){addAssetRow(a.n,a.m,a.y,a.c,a.u,a.p,a.x);});}
+  if(st.a&&st.a.length){assetsBox.innerHTML='';st.a.forEach(function(a){addAssetRow(a.n,a.m,a.y,a.c,a.u,a.p,a.x,a.g);});}
   else seedAssets();
   return true;
 }
 function seedAssets(){
   assetsBox.innerHTML='';
-  addAssetRow('家計貯金(普通)',195,0.1,'cash',0,'any',0);
-  addAssetRow('定期預金',300,0.2,'cash',0,'any',0);
-  addAssetRow('長女貯金',57,0.1,'cash',0,'edu',0);
-  addAssetRow('次女貯金',47,0.1,'cash',0,'edu',0);
-  addAssetRow('NISA',518,4,'invest',0,'any',0);
-  addAssetRow('ジュニアNISA(長女)',352,4,'invest',0,'edu',0);
-  addAssetRow('ジュニアNISA(次女)',352,4,'invest',0,'edu',0);
-  addAssetRow('iDeCo',129,3,'locked',65,'any',0);
-  addAssetRow('個人型年金',470,1.2,'locked',65,'any',0);
-  addAssetRow('財形年金',316,1.2,'locked',60,'any',0);
+  addAssetRow('家計貯金(普通)',195,0.1,'cash',0,'any',0,'auto');
+  addAssetRow('定期預金',300,0.2,'cash',0,'any',0,'auto');
+  addAssetRow('長女貯金',57,0.1,'cash',0,'edu',0,'auto');
+  addAssetRow('次女貯金',47,0.1,'cash',0,'edu',0,'auto');
+  addAssetRow('NISA',518,4,'invest',0,'any',0,'auto');
+  addAssetRow('ジュニアNISA(長女)',352,4,'invest',0,'edu',0,'auto');
+  addAssetRow('ジュニアNISA(次女)',352,4,'invest',0,'edu',0,'auto');
+  addAssetRow('iDeCo',129,3,'locked',65,'any',0,'invest');
+  addAssetRow('個人型年金',470,1.2,'locked',65,'any',0,'auto');
+  addAssetRow('財形年金',316,1.2,'locked',60,'any',0,'auto');
 }
 function seedNisa(){nisaBox.innerHTML='';addNisaRow(39,120);addNisaRow(50,60);addNisaRow(66,0);}
 function seedIdeco(){idecoBox.innerHTML='';addIdecoRow(39,24);addIdecoRow(66,0);}
